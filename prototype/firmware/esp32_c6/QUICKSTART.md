@@ -1,10 +1,10 @@
-# Kywo Firmware - Quick Start Guide
+# SOMO Firmware - Quick Start Guide
 
 ## 1. Prerequisites
 
 - **PlatformIO**: Install via VSCode or CLI
 - **ESP32-C6 board**: Connected via USB
-- **Server running**: Kywo server on local network
+- **Server running**: SOMO server on local network
 
 ## 2. Configuration (5 minutes)
 
@@ -126,7 +126,7 @@ Repeat steps 2-6 for each additional ESP32-C6:
 
 ```
 ┌─────────────┐    HTTP/TCP (1s poll)    ┌──────────────┐
-│  Kywo       │ ◄───────────────────────► │  ESP32-C6    │
+│  SOMO       │ ◄───────────────────────► │  ESP32-C6    │
 │  Server     │                           │  Device 1    │
 └─────────────┘                           │ (Grandmaster)│
                                           └──────────────┘

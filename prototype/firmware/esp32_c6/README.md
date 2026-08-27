@@ -1,4 +1,4 @@
-# Kywo Production Firmware - ESP32-C6
+# SOMO Production Firmware - ESP32-C6
 
 Production firmware for distributed ESP32 control system with ESP-NOW clock synchronization.
 
@@ -17,6 +17,7 @@ Production firmware for distributed ESP32 control system with ESP-NOW clock sync
 | Digital Output 2 | GPIO 23 | Digital | Binary output (HIGH/LOW) |
 | Digital Output 3 | GPIO 22 | Digital | Binary output (HIGH/LOW) |
 | PWM Output | GPIO 4 | PWM | Variable duty cycle (0-255) |
+| Analog Sensor | GPIO 6 | ADC | 12-bit analog input (0-4095) |
 | Static HIGH | GPIO 7 | Digital | Always HIGH after boot |
 | Static LOW | GPIO 21 | Digital | Always LOW after boot |
 
@@ -32,10 +33,16 @@ Production firmware for distributed ESP32 control system with ESP-NOW clock sync
 1. **HTTP/TCP Configuration Layer**
    - **Purpose**: Configuration polling from server
    - **Interval**: 1000ms
-   - **Endpoint**: `GET /devices/{device_id}/config`
-   - **Payload**: Sequence configuration + master role assignment
+  - **Endpoint**: `GET /devices/{device_id}/config`
+  - **Response**: Sequence configuration + master role assignment
 
-2. **ESP-NOW Synchronization Layer**
+2. **HTTP/TCP Telemetry Layer**
+  - **Purpose**: Analog sensor reporting
+  - **Interval**: 100ms (10Hz)
+  - **Endpoint**: `POST /devices/{device_id}/telemetry`
+  - **Request**: Latest analog sensor reading
+
+3. **ESP-NOW Synchronization Layer**
    - **Purpose**: Microsecond-precision clock synchronization
   - **Interval**: 500ms broadcast (master only)
   - **Latency Compensation**: Calibrated one-way estimate (625us)
@@ -97,7 +104,12 @@ static const int PIN_DIGITAL_OUT1 = 5;
 static const int PIN_DIGITAL_OUT2 = 23;
 static const int PIN_DIGITAL_OUT3 = 22;
 static const int PIN_PWM_OUT      = 4;
+static const int PIN_ANALOG_SENSOR = 6;
 ```
+
+The firmware samples GPIO 6 every five seconds and sends its raw 12-bit ADC
+value, calibrated millivolts, and device uptime to the server. Do not use GPIO
+6 for an output when an analog sensor is connected.
 
 ## Building and Flashing
 
@@ -134,7 +146,7 @@ pio run --target upload && pio device monitor
 
 ```
 ========================================
-Kywo - Production Firmware v3.0.0
+SOMO - Production Firmware v3.0.0
 Distributed ESP32 Control System
 ========================================
 
@@ -170,7 +182,7 @@ Content-Type: application/json
 
 {
   "device_id": "ESP32-C6-A3B4",
-  "device_token": "kywo-device-token",
+  "device_token": "somo-device-token",
   "firmware_version": "3.0.0-Production",
   "wifi_channel": 1
 }
@@ -272,7 +284,7 @@ guaranteed by the firmware alone.
 
 ## License
 
-Part of the Kywo Distributed Control System.  
+Part of the SOMO Distributed Control System.  
 See repository root for license information.
 
 ## Version History

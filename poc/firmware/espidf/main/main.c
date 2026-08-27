@@ -27,7 +27,7 @@
 #define COMMAND_POLL_MS 2000
 #define MAX_HTTP_RECV_BUFFER 2048
 
-static const char *TAG = "kywo_client";
+static const char *TAG = "somo_client";
 static int last_command_id = 0;
 static bool is_registered = false;
 static EventGroupHandle_t s_wifi_event_group;

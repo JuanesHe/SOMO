@@ -52,7 +52,7 @@ def load_sync_data(filepath):
 
 def main():
     # File paths
-    base_dir = r'c:\Users\jehm\Documents\kywoSystem\test_results'
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'test_results'))
     f_ping = os.path.join(base_dir, 'ping_test_20260316_104917.csv')
     f_arch1 = os.path.join(base_dir, 'arch1_latency_sync_test_20260316_104328.csv')
     f_arch2 = os.path.join(base_dir, 'arch2_sync_test_20260316_132711.csv')
@@ -254,7 +254,7 @@ def main():
     # Generate Test Summary Tables in LaTeX Format
     summary_path = os.path.join(output_dir, 'test_summary_tables.tex')
     with open(summary_path, 'w', encoding='utf-8') as f_sum:
-        f_sum.write("% KYWO SYSTEM - EXPERIMENTAL TEST SUMMARY TABLES\n")
+        f_sum.write("% SOMO SYSTEM - EXPERIMENTAL TEST SUMMARY TABLES\n")
         f_sum.write("% Date: March 16, 2026\n")
         f_sum.write("% Copy and paste these tables into your LaTeX document\n\n")
         

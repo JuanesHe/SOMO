@@ -10,6 +10,18 @@ class DeviceRegistrationRequest(BaseModel):
     wifi_channel: int | None = None
 
 
+class SensorReading(BaseModel):
+    """Latest analog sensor sample reported by a device."""
+    raw: int = Field(ge=0, le=4095)
+    millivolts: int | None = Field(default=None, ge=0, le=3300)
+    sampled_at_us: int = Field(ge=0)
+
+
+class DeviceTelemetryRequest(BaseModel):
+    """Telemetry submitted by a device."""
+    sensor: SensorReading
+
+
 class DeviceRecord(BaseModel):
     """Device registration and status record."""
     device_id: str
@@ -18,6 +30,8 @@ class DeviceRecord(BaseModel):
     last_seen: datetime
     is_master: bool = False
     wifi_channel: int | None = None
+    sensor: SensorReading | None = None
+    sensor_received_at: datetime | None = None
 
 
 class DeviceStatus(BaseModel):
@@ -28,5 +42,7 @@ class DeviceStatus(BaseModel):
     last_seen: datetime
     is_master: bool = False
     wifi_channel: int | None = None
+    sensor: SensorReading | None = None
+    sensor_received_at: datetime | None = None
     is_online: bool
     seconds_since_seen: float

@@ -1,16 +1,16 @@
-# Kywo — Architecture & API Reference
+# SOMO — Architecture & API Reference
 
 ## System Overview
 
-Kywo is a distributed edge-control system. Multiple **ESP32-C6 nodes** execute synchronized digital and PWM output sequences locally. A central **Python/FastAPI server** serves the browser UI, keeps device and sequence state in memory, and assigns the Grandmaster role. Nodes obtain their configuration through HTTP polling and synchronize clocks directly through ESP-NOW; the server is not part of the clock-sync data path.
+SOMO is a distributed edge-control system. Multiple **ESP32-C6 nodes** execute synchronized digital and PWM output sequences locally. A central **Python/FastAPI server** serves the browser UI, keeps device and sequence state in memory, and assigns the Grandmaster role. Nodes obtain their configuration through HTTP polling and synchronize clocks directly through ESP-NOW; the server is not part of the clock-sync data path.
 
 ### System Context Diagram
 
 ```mermaid
 flowchart TB
   admin["Administrator"]
-  browser["Web browser\nKywo web UI"]
-  server["Kywo prototype server\nFastAPI :8000\nIn-memory device registry and sequences\nMaster arbitration"]
+  browser["Web browser\nSOMO web UI"]
+  server["SOMO prototype server\nFastAPI :8000\nIn-memory device registry and sequences\nMaster arbitration"]
   master["ESP32-C6 node\nGrandmaster\nLocal sequence execution\nGPIO / PWM outputs"]
   follower["ESP32-C6 node(s)\nFollower\nLocal sequence execution\nGPIO / PWM outputs"]
 
@@ -465,7 +465,7 @@ Registers a new device. Called by the firmware on boot. No API key required.
 ```json
 {
   "device_id": "ESP32-C6-AABB",
-  "device_token": "kywo-device-token",
+  "device_token": "somo-device-token",
   "firmware_version": "3.0.0-Production",
   "wifi_channel": 6
 }
@@ -480,7 +480,7 @@ Registers a new device. Called by the firmware on boot. No API key required.
 ```json
 {
   "device_id": "ESP32-C6-AABB",
-  "device_token": "kywo-device-token",
+  "device_token": "somo-device-token",
   "firmware_version": "3.0.0-Production",
   "last_seen": "2026-04-22T10:00:00Z",
   "is_master": false,
@@ -498,7 +498,7 @@ Lists all registered devices with online status. Requires API key.
 [
   {
     "device_id": "ESP32-C6-AABB",
-    "device_token": "kywo-device-token",
+    "device_token": "somo-device-token",
     "firmware_version": "3.0.0-Production",
     "last_seen": "2026-04-22T10:00:01Z",
     "is_master": true,
@@ -600,6 +600,35 @@ Sequence length is limited to **20 states** by the firmware buffer (server store
 ```json
 { "status": "config_updated", "device": "ESP32-C6-AABB", "states": 1 }
 ```
+
+---
+
+#### `POST /devices/{device_id}/telemetry`
+Firmware calls this endpoint independently of configuration polling. The default
+firmware interval is five seconds. It sends the latest analog sensor reading;
+the endpoint returns an acknowledgement. Requires API key.
+
+**Request body**
+```json
+{
+  "sensor": {
+    "raw": 2048,
+    "millivolts": 1650,
+    "sampled_at_us": 123456789
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `raw` | 12-bit ADC reading (0-4095) |
+| `millivolts` | Calibrated ADC voltage in mV (0-3300) |
+| `sampled_at_us` | Device uptime when the sample was taken |
+
+The server stores only the most recent reading in memory. `GET /devices` returns
+it in the optional `sensor` field together with `sensor_received_at`, the UTC
+time the server received it. Sensor sampling is part of the low-priority HTTP
+path and does not participate in ESP-NOW synchronization or state-machine timing.
 
 ---
 

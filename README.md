@@ -1,4 +1,4 @@
-# Kywo System: Distributed ESP32-C6 Coordination Platform
+# SOMO System: Distributed ESP32-C6 Coordination Platform
 
 A distributed system for synchronized control of multiple ESP32-C6 devices using autonomous execution with periodic clock synchronization.
 
@@ -13,7 +13,7 @@ Production-ready implementation of Architecture 2 with improved synchronization 
 ## Repository Structure
 
 ```
-kywoSystem/
+SOMO/
 ├── poc/                    # Proof-of-concept artifacts (COMPLETE)
 │   ├── firmware/          # All POC firmware variants
 │   ├── server/           # POC FastAPI server (command queuing)

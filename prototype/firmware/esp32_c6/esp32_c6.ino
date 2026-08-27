@@ -1,5 +1,5 @@
 /*
- * Kywo - Distributed ESP32 Control System (Production Firmware)
+ * SOMO - Distributed ESP32 Control System (Production Firmware)
  * 
  * Architecture: Distributed autonomous execution with ESP-NOW clock synchronization
  * Target: <50µs mean drift between nodes
@@ -52,6 +52,7 @@ static const int PIN_DIGITAL_OUT1 = 5;   // GPIO 5
 static const int PIN_DIGITAL_OUT2 = 23;  // GPIO 23
 static const int PIN_DIGITAL_OUT3 = 22;  // GPIO 22
 static const int PIN_PWM_OUT      = 4;   // GPIO 4
+static const int PIN_ANALOG_SENSOR = 6;  // GPIO 6 (ADC1_CH6)
 
 // Static pins (fixed level)
 static const int PIN_STATIC_HIGH  = 7;   // GPIO 7  - always HIGH
@@ -252,7 +253,7 @@ void registerWithServer() {
 
   StaticJsonDocument<256> doc;
   doc["device_id"] = deviceId;
-  doc["device_token"] = "kywo-device-token";
+  doc["device_token"] = "somo-device-token";
   doc["firmware_version"] = "3.0.0-Production";
   doc["wifi_channel"] = WiFi.channel();
   
@@ -275,6 +276,7 @@ void registerWithServer() {
 // CONFIGURATION POLLING (HTTP/TCP)
 // ==========================================
 uint32_t lastPollMs = 0;
+uint32_t lastTelemetryMs = 0;
 String lastPayload = "";
 
 void pollForConfig() {
@@ -351,6 +353,27 @@ void pollForConfig() {
     Serial.printf("[config] HTTP error: %d\n", httpCode);
   }
   
+  http.end();
+}
+
+void sendTelemetry() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  String url = String(SERVER_URL) + "/devices/" + deviceId + "/telemetry";
+  http.begin(url);
+  http.addHeader("x-api-key", API_KEY);
+  http.addHeader("Content-Type", "application/json");
+
+  StaticJsonDocument<192> telemetryDoc;
+  JsonObject sensor = telemetryDoc.createNestedObject("sensor");
+  sensor["raw"] = analogRead(PIN_ANALOG_SENSOR);
+  sensor["millivolts"] = analogReadMilliVolts(PIN_ANALOG_SENSOR);
+  sensor["sampled_at_us"] = esp_timer_get_time();
+
+  String payload;
+  serializeJson(telemetryDoc, payload);
+  http.POST(payload);
   http.end();
 }
 
@@ -468,7 +491,7 @@ void setup() {
   delay(1000);
   
   Serial.println("\n========================================");
-  Serial.println("Kywo - Production Firmware v3.0.0");
+  Serial.println("SOMO - Production Firmware v3.0.0");
   Serial.println("Distributed ESP32 Control System");
   Serial.println("========================================\n");
 
@@ -476,6 +499,8 @@ void setup() {
   pinMode(PIN_DIGITAL_OUT1, OUTPUT);
   pinMode(PIN_DIGITAL_OUT2, OUTPUT);
   pinMode(PIN_DIGITAL_OUT3, OUTPUT);
+  pinMode(PIN_ANALOG_SENSOR, INPUT);
+  analogReadResolution(12);
   digitalWrite(PIN_DIGITAL_OUT1, LOW);
   digitalWrite(PIN_DIGITAL_OUT2, LOW);
   digitalWrite(PIN_DIGITAL_OUT3, LOW);
@@ -495,6 +520,7 @@ void setup() {
                 PIN_DIGITAL_OUT1, PIN_DIGITAL_OUT2, PIN_DIGITAL_OUT3);
   Serial.printf("  PWM output: GPIO %d (%d Hz)\n", 
                 PIN_PWM_OUT, PWM_FREQUENCY);
+  Serial.printf("  Analog sensor: GPIO %d\n", PIN_ANALOG_SENSOR);
   Serial.printf("  Static HIGH: GPIO %d, Static LOW: GPIO %d\n",
                 PIN_STATIC_HIGH, PIN_STATIC_LOW);
 
@@ -565,6 +591,12 @@ void loop() {
   if (now - lastPollMs > 1000) {
     lastPollMs = now;
     pollForConfig();
+  }
+
+  // Send sensor telemetry independently of state-machine configuration at 10 Hz.
+  if (now - lastTelemetryMs >= 100) {
+    lastTelemetryMs = now;
+    sendTelemetry();
   }
 
   // Status heartbeat every 5 seconds

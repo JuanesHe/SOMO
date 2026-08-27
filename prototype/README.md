@@ -1,4 +1,4 @@
-# Kywo Prototype - Architecture 2 Implementation
+# SOMO 
 
 Production-ready implementation of the distributed Architecture 2 approach with improved synchronization.
 
@@ -88,38 +88,42 @@ curl http://localhost:8000/devices
 curl http://localhost:8000/metrics/drift
 ```
 
-## Development Status
 
-### Phase 1: Core Firmware ⏳
-- [ ] Grandmaster firmware with improved sync broadcast
-- [ ] Follower firmware with dynamic drift compensation
-- [ ] Shared library for common functions
 
-### Phase 2: Server Enhancement ⏳
-- [ ] Sequence configuration API
-- [ ] Real-time metrics collection
-- [ ] Dashboard UI
+## Latest Hardware Synchronization Result
 
-### Phase 3: Testing & Validation ⏳
-- [ ] Hardware sync validation (target: <50µs)
-- [ ] Long-term stability testing (24h+ runs)
-- [ ] Multi-node scalability tests (10+ devices)
+The latest Architecture 2 hardware-observer run analyzed 200 pulses using the
+500ms ESP-NOW synchronization interval. It achieved much lower variation than
+the POC, but the mean error and high-percentile jitter remain above the
+prototype targets.
 
-### Phase 4: Documentation & Deployment ⏳
-- [ ] Complete API documentation
-- [ ] Deployment guide
-- [ ] Troubleshooting guide
+| Metric | Latest Result |
+|--------|---------------|
+| Pulses analyzed | 200 |
+| Mean sync error | 116.50us |
+| Standard deviation | 134.75us |
+| Minimum jitter | 1us |
+| Maximum jitter | 936us |
+| 95th percentile | 261.9us |
+| 99th percentile | 519.4us |
+| Device A faster | 46 pulses |
+| Device B faster | 154 pulses |
+| Perfect sync | 0 pulses |
 
-## Target Specifications
+Device B was faster in 77% of the recorded pulses, indicating a remaining
+systematic phase bias. The near-zero minimum shows that precise alignment is
+possible, while the high-percentile results show that it is not yet consistent.
 
-| Metric | POC Result | Prototype Target |
-|--------|------------|------------------|
-| Mean Drift | 108µs | <50µs |
-| Std Dev | 496µs | <100µs |
-| Max Drift | 6.5ms | <500µs |
-| Sync Interval | 2000ms | 500ms |
-| Network Load | Low | Low |
-| Device Autonomy | Full | Full |
+## Synchronization Targets and Results
+
+| Metric | POC Result | Latest Result | Prototype Target | Status |
+|--------|------------|---------------|------------------|--------|
+| Mean sync error | 108us | 116.50us | <50us | Not met |
+| Standard deviation | 496us | 134.75us | <100us | Not met |
+| Maximum jitter | 6.5ms | 936us | <500us | Not met |
+| Sync interval | 2000ms | 500ms | 500ms | Met |
+| Network load | Low | Low | Low | Met |
+| Device autonomy | Full | Full | Full | Met |
 
 ---
 **Status**: In Development 🚧  

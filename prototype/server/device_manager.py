@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import asyncio
 
-from .models import DeviceRecord
+from .models import DeviceRecord, SensorReading
 
 
 class DeviceManager:
@@ -33,6 +33,15 @@ class DeviceManager:
         async with self._lock:
             if device_id in self._devices:
                 self._devices[device_id].last_seen = datetime.now(timezone.utc)
+
+    async def record_sensor_reading(self, device_id: str, sensor: SensorReading) -> None:
+        """Store the latest sensor sample and update the device heartbeat."""
+        async with self._lock:
+            if device_id in self._devices:
+                now = datetime.now(timezone.utc)
+                self._devices[device_id].sensor = sensor
+                self._devices[device_id].sensor_received_at = now
+                self._devices[device_id].last_seen = now
 
     async def validate_device(self, device_id: str, token: str) -> bool:
         async with self._lock:

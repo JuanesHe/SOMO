@@ -1,5 +1,5 @@
 /*
- * Kywo Firmware - Configuration Template
+ * SOMO Firmware - Configuration Template
  * 
  * Instructions:
  * 1. Copy this file to 'config.h'

@@ -9,11 +9,12 @@ from pydantic import BaseModel, Field
 from .device_manager import DeviceManager
 from .models import (
     DeviceRecord,
+    DeviceTelemetryRequest,
     DeviceRegistrationRequest,
     DeviceStatus,
 )
 
-app = FastAPI(title="Kywo Prototype Server - Architecture 2", version="1.0.0")
+app = FastAPI(title="SOMO Prototype Server - Architecture 2", version="1.0.0")
 
 # Mount web UI files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -101,6 +102,28 @@ async def get_device_config(device_id: str, x_api_key: str = Header(default=""))
     return config
 
 
+@app.post("/devices/{device_id}/telemetry")
+async def record_device_telemetry(
+    device_id: str,
+    payload: DeviceTelemetryRequest,
+    x_api_key: str = Header(default=""),
+):
+    """Record the latest telemetry sample from a known device."""
+    if x_api_key != admin_api_key:
+        raise HTTPException(status_code=401, detail="Invalid admin API key")
+
+    if device_id not in manager._devices:
+        await manager.register_device(
+            device_id=device_id,
+            device_token="auto-token",
+            firmware_version="2.0-AutoRecovery",
+            wifi_channel=0,
+        )
+
+    await manager.record_sensor_reading(device_id, payload.sensor)
+    return {"status": "telemetry_recorded"}
+
+
 class StateNode(BaseModel):
     """Fixed configuration: 3 digital outputs + 1 PWM output."""
     digital_out1: bool
@@ -183,6 +206,8 @@ async def list_devices(x_api_key: str = Header(default="")) -> list[DeviceStatus
             last_seen=device.last_seen,
             is_master=device.is_master,
             wifi_channel=device.wifi_channel,
+            sensor=device.sensor,
+            sensor_received_at=device.sensor_received_at,
             is_online=is_online,
             seconds_since_seen=seconds_since_seen
         ))
