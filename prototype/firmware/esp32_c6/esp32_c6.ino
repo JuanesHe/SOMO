@@ -11,7 +11,7 @@
  * 
  * Communication:
  *   - HTTP/TCP: Configuration polling (1000ms interval)
- *   - ESP-NOW: Clock synchronization broadcast (2000ms interval)
+ *   - ESP-NOW: Low-overhead clock synchronization broadcast (500ms interval)
  * 
  * Firmware Version: 3.0.0-Production
  * Date: March 17, 2026
@@ -98,8 +98,9 @@ volatile bool is_master_clock = false;
 volatile int  master_channel = 0;
 bool esp_now_initialized = false;
 
-volatile int64_t clockOffsetUs = 0;
-volatile bool    clockSynced = false;
+portMUX_TYPE clockMux = portMUX_INITIALIZER_UNLOCKED;
+bool clockSynced = false;
+int64_t clockOffsetUs = 0;
 
 typedef struct sync_message_t {
   uint32_t magic;
@@ -108,9 +109,35 @@ typedef struct sync_message_t {
 
 const uint32_t SYNC_MAGIC = 0xA2C22026;  // Updated magic number for v3.0
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+const uint32_t SYNC_INTERVAL_MS = 500;
+const int64_t LATENCY_COMPENSATION_US = 625;
+const int64_t MAX_OFFSET_ERROR_US = 1500;
 
-// Sync improvement: Dynamic latency compensation
-const int64_t LATENCY_COMPENSATION_US = 1054;  // Measured ESP-NOW median latency
+int64_t absoluteValue(int64_t value) {
+  return value < 0 ? -value : value;
+}
+
+void applyClockMeasurement(int64_t measuredOffsetUs) {
+  portENTER_CRITICAL(&clockMux);
+
+  if (!clockSynced) {
+    clockOffsetUs = measuredOffsetUs;
+    clockSynced = true;
+    portEXIT_CRITICAL(&clockMux);
+    Serial.printf("[ESP-NOW] Clock synchronized. Offset: %lld us\n", measuredOffsetUs);
+    return;
+  }
+
+  int64_t offsetErrorUs = measuredOffsetUs - clockOffsetUs;
+  if (absoluteValue(offsetErrorUs) > MAX_OFFSET_ERROR_US) {
+    portEXIT_CRITICAL(&clockMux);
+    return;
+  }
+
+  // Apply half of each accepted correction to limit accumulated clock drift.
+  clockOffsetUs += offsetErrorUs / 2;
+  portEXIT_CRITICAL(&clockMux);
+}
 
 // ==========================================
 // WIFI CONNECTION
@@ -158,29 +185,15 @@ void OnDataRecv(const esp_now_recv_info_t *info, const uint8_t *incomingData, in
 #else
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 #endif
-  if (is_master_clock) return; // Grandmaster ignores incoming sync messages
-  
   if (len == sizeof(sync_message_t)) {
     sync_message_t msg;
     memcpy(&msg, incomingData, sizeof(msg));
     
-    if (msg.magic == SYNC_MAGIC) {
-      // Apply latency compensation based on ESP-NOW transmission time
-      int64_t masterTimeUs = msg.master_time_us + LATENCY_COMPENSATION_US;
-      int64_t localUptimeUs = esp_timer_get_time();
-      int64_t instantOffsetUs = masterTimeUs - localUptimeUs;
-      
-      if (!clockSynced) {
-        // Initial synchronization
-        clockOffsetUs = instantOffsetUs;
-        clockSynced = true;
-        Serial.printf("[ESP-NOW] Clock synchronized to Grandmaster! Offset: %lld µs\n", instantOffsetUs);
-      } else {
-        // Continuous synchronization updates
-        clockOffsetUs = instantOffsetUs;
-        Serial.print(".");  // Sync pulse indicator
-      }
-    }
+    if (msg.magic != SYNC_MAGIC || is_master_clock) return;
+
+    int64_t localReceiveTimeUs = esp_timer_get_time();
+    int64_t offsetUs = msg.master_time_us + LATENCY_COMPENSATION_US - localReceiveTimeUs;
+    applyClockMeasurement(offsetUs);
   }
 }
 
@@ -213,12 +226,16 @@ void configureEspNow() {
       Serial.printf("[ESP-NOW] Broadcasting on channel %d\n", peerInfo.channel);
     }
     
+    portENTER_CRITICAL(&clockMux);
     clockSynced = true;
     clockOffsetUs = 0;
+    portEXIT_CRITICAL(&clockMux);
   } else {
     // Configure as Follower
     Serial.printf("[ESP-NOW] Role: FOLLOWER (listening on channel %d)\n", master_channel);
+    portENTER_CRITICAL(&clockMux);
     clockSynced = false;  // Wait for first sync message
+    portEXIT_CRITICAL(&clockMux);
   }
 }
 
@@ -341,8 +358,12 @@ void pollForConfig() {
 // TIME SYNCHRONIZATION HELPER
 // ==========================================
 int64_t getSyncedTimeUs() {
-  if (!clockSynced) return 0;
-  return esp_timer_get_time() + clockOffsetUs;
+  int64_t localTimeUs = esp_timer_get_time();
+  portENTER_CRITICAL(&clockMux);
+  bool isSynced = clockSynced;
+  int64_t offsetUs = isSynced ? clockOffsetUs : 0;
+  portEXIT_CRITICAL(&clockMux);
+  return isSynced ? localTimeUs + offsetUs : 0;
 }
 
 // ==========================================
@@ -350,7 +371,12 @@ int64_t getSyncedTimeUs() {
 // ==========================================
 void syncBroadcastTask(void * pvParameters) {
   while (true) {
-    if (is_master_clock && clockSynced) {
+    bool isSynced;
+    portENTER_CRITICAL(&clockMux);
+    isSynced = clockSynced;
+    portEXIT_CRITICAL(&clockMux);
+
+    if (is_master_clock && isSynced) {
       sync_message_t msg;
       msg.magic = SYNC_MAGIC;
       msg.master_time_us = esp_timer_get_time();
@@ -364,7 +390,7 @@ void syncBroadcastTask(void * pvParameters) {
       }
     }
     
-    vTaskDelay(pdMS_TO_TICKS(2000));  // 2 second sync interval
+    vTaskDelay(pdMS_TO_TICKS(SYNC_INTERVAL_MS));
   }
 }
 

@@ -2,25 +2,26 @@
 
 ## System Overview
 
-Kywo is a distributed edge-control system. Multiple **ESP32-C6 nodes** execute synchronized output sequences (digital + PWM) autonomously. A central **Python/FastAPI server** provides configuration storage and device management. Nodes communicate with the server over **HTTP/TCP** and synchronize clocks with each other over **ESP-NOW** (no server involvement in the sync path).
+Kywo is a distributed edge-control system. Multiple **ESP32-C6 nodes** execute synchronized digital and PWM output sequences locally. A central **Python/FastAPI server** serves the browser UI, keeps device and sequence state in memory, and assigns the Grandmaster role. Nodes obtain their configuration through HTTP polling and synchronize clocks directly through ESP-NOW; the server is not part of the clock-sync data path.
 
+### System Context Diagram
+
+```mermaid
+flowchart TB
+  admin["Administrator"]
+  browser["Web browser\nKywo web UI"]
+  server["Kywo prototype server\nFastAPI :8000\nIn-memory device registry and sequences\nMaster arbitration"]
+  master["ESP32-C6 node\nGrandmaster\nLocal sequence execution\nGPIO / PWM outputs"]
+  follower["ESP32-C6 node(s)\nFollower\nLocal sequence execution\nGPIO / PWM outputs"]
+
+  admin -->|"Uses"| browser
+  browser -->|"HTTP REST\nGET /devices\nPOST /devices/{id}/config\nPOST /emergency_stop"| server
+  master -->|"HTTP\nPOST /devices/register\nGET /devices/{id}/config every 1 s"| server
+  follower -->|"HTTP\nPOST /devices/register\nGET /devices/{id}/config every 1 s"| server
+  master -->|"ESP-NOW broadcast every 2 s\nmaster timestamp"| follower
 ```
-┌──────────────────────────────────────────────┐
-│  Admin / Web UI  (browser → HTTP)            │
-└───────────────────────┬──────────────────────┘
-                        │  REST API
-              ┌─────────▼──────────┐
-              │   FastAPI Server   │
-              │   (port 8000)      │
-              └──┬──────────────┬──┘
-         HTTP/TCP│              │HTTP/TCP
-         (poll)  │              │ (poll)
-        ┌────────▼──┐      ┌────▼────────┐
-        │  Node A   │◄────►│   Node B    │
-        │ (Master)  │      │ (Follower)  │
-        └───────────┘      └─────────────┘
-           ESP-NOW broadcast (clock sync only)
-```
+
+The ESP32 firmware applies the downloaded sequence locally using a double buffer. The server's response to each config poll includes the current `is_master` role and `master_channel`; it does not send execution commands or clock-sync frames to devices.
 
 ### Design Pattern
 The server acts as a **central configuration store with per-device state**:
