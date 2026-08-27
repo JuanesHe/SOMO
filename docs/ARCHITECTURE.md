@@ -16,9 +16,9 @@ flowchart TB
 
   admin -->|"Uses"| browser
   browser -->|"HTTP REST\nGET /devices\nPOST /devices/{id}/config\nPOST /emergency_stop"| server
-  master -->|"HTTP\nPOST /devices/register\nGET /devices/{id}/config every 1 s"| server
-  follower -->|"HTTP\nPOST /devices/register\nGET /devices/{id}/config every 1 s"| server
-  master -->|"ESP-NOW broadcast every 2 s\nmaster timestamp"| follower
+  master -->|"HTTP\nPOST /devices/register\nGET /devices/{id}/config every 1 s\nPOST /devices/{id}/telemetry every 100 ms"| server
+  follower -->|"HTTP\nPOST /devices/register\nGET /devices/{id}/config every 1 s\nPOST /devices/{id}/telemetry every 100 ms"| server
+  master -->|"ESP-NOW broadcast every 500 ms\nmaster timestamp"| follower
 ```
 
 The ESP32 firmware applies the downloaded sequence locally using a double buffer. The server's response to each config poll includes the current `is_master` role and `master_channel`; it does not send execution commands or clock-sync frames to devices.

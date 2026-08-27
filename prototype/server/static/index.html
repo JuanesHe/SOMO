@@ -228,6 +228,16 @@
         }
         .device-info {
             flex: 1;
+
+        .sensor-reading {
+            color: var(--accent);
+            font-size: 0.75rem;
+            font-variant-numeric: tabular-nums;
+            margin-top: 0.25rem;
+        }
+        .sensor-reading.unavailable {
+            color: var(--muted);
+        }
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
@@ -569,8 +579,21 @@
                             const timeAgo = formatTimeAgo(d.seconds_since_seen);
                             metaRow.textContent = `${d.is_online ? 'Online' : 'Offline'} · Last seen ${timeAgo} · FW: ${d.firmware_version || 'N/A'}`;
 
+                            const sensorRow = document.createElement('div');
+                            sensorRow.className = 'sensor-reading';
+                            if (d.sensor) {
+                                const voltage = d.sensor.millivolts === null
+                                    ? 'n/a'
+                                    : `${d.sensor.millivolts} mV`;
+                                sensorRow.textContent = `Sensor: ${voltage} · Raw: ${d.sensor.raw}`;
+                            } else {
+                                sensorRow.classList.add('unavailable');
+                                sensorRow.textContent = 'Sensor: waiting for telemetry';
+                            }
+
                             info.appendChild(nameRow);
                             info.appendChild(metaRow);
+                            info.appendChild(sensorRow);
 
                             const deleteBtn = document.createElement('button');
                             deleteBtn.className = 'btn-delete';
